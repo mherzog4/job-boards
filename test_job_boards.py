@@ -880,6 +880,63 @@ def test_csv_quoting():
     assert row["location"] == "Remote – US • EU"
 
 
+def test_a_throttled_board_is_retried_not_dropped():
+    """429 and 403 are 4xx, so they used to take the raise-immediately path.
+
+    A real Greenhouse run lost 8 consecutive slugs to that: the board was thrown
+    away for the whole run on the first refusal, with no backoff and no second
+    chance. 404 must keep raising at once — that one means "not a customer", and
+    retrying it would quadruple the cost of every dead slug.
+    """
+    import job_boards as jb
+
+    original_request, original_sleep = jb._single_request, jb.time.sleep
+    jb.time.sleep = lambda seconds: None        # keep the suite offline and instant
+    try:
+        for status in (429, 403):
+            calls = []
+
+            def refuse_twice(u, m, t, e=None, _s=status, _calls=calls):
+                _calls.append(1)
+                if len(_calls) <= 2:
+                    return _s, {}, b""
+                return 200, {}, b'{"jobs": []}'
+
+            jb._single_request = refuse_twice
+            assert jb.fetch("https://api.lever.co/x") == b'{"jobs": []}', \
+                f"a {status} that clears on retry must still return the body"
+            assert len(calls) == 3, f"expected 2 refusals then a success, got {len(calls)}"
+
+        calls = []
+
+        def always_404(u, m, t, e=None, _calls=calls):
+            _calls.append(1)
+            return 404, {}, b""
+
+        jb._single_request = always_404
+        raised = False
+        try:
+            jb.fetch("https://api.lever.co/x")
+        except jb.NotFound:
+            raised = True
+        assert raised and len(calls) == 1, "404 must raise on the first attempt"
+    finally:
+        jb._single_request, jb.time.sleep = original_request, original_sleep
+
+
+def test_retry_after_beats_the_exponential_delay_but_is_capped():
+    """The server saying "wait 5s" is better information than 2**attempt.
+
+    Capped, because a server asking for an hour would stall a 13,000-board run
+    behind one slug; giving up and logging that board is the better trade.
+    """
+    from job_boards import _retry_delay
+    assert _retry_delay("5", 0) == 5.0, "an explicit Retry-After wins"
+    assert _retry_delay(None, 3) == 8.0, "no header falls back to 2**attempt"
+    assert _retry_delay("garbage", 2) == 4.0, "an unparseable header falls back too"
+    assert _retry_delay("3600", 0) == 30.0, "an absurd Retry-After is capped"
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

@@ -538,7 +538,9 @@ README and let OpenWiki regenerate them (`openwiki --update`).
 
 **Network etiquette is a requirement, not a style preference.** Concurrency is capped at
 8, Common Crawl is throttled to its stated 1 request/second, and every request identifies
-itself. Do not raise these to make something finish faster.
+itself. Do not raise these to make something finish faster. A `429` or `403` backs off
+exponentially and honours `Retry-After` when the server sends one, capped at 30 seconds;
+backing off is the polite response to being throttled, so do not shorten it either.
 
 **If you add a platform, add its posting-API host to `_POOLED_HOSTS`.** Connection
 pooling is opt-in per host, so a new host silently keeps opening a fresh TLS connection

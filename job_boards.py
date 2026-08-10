@@ -186,6 +186,20 @@ def _single_request(
         return e.code, _lower_headers(e.headers or {}), e.read()
 
 
+# ponytail: seconds-form Retry-After only. The HTTP-date form is legal but none of
+# these APIs send it, and falling back to the exponential delay is already correct.
+def _retry_delay(retry_after: str | None, attempt: int, cap: float = 30.0) -> float:
+    """How long to wait before retrying a throttled request.
+
+    Capped: a server asking for an hour would stall a 13,000-board run behind one
+    slug, and at that point giving up and logging the board is the better trade.
+    """
+    try:
+        return min(float(retry_after), cap)
+    except (TypeError, ValueError):
+        return float(2**attempt)
+
+
 def fetch(
     url: str,
     timeout: int = 30,
@@ -198,6 +212,12 @@ def fetch(
 
     Common Crawl's CDX index 502/504s under load often enough that a single
     attempt fails maybe half the time, so 5xx gets exponential backoff.
+
+    429 and 403 get the same backoff. They are 4xx, so without this they took the
+    raise-immediately path and a throttled board was dropped for the whole run: a
+    real Greenhouse scrape lost 8 consecutive slugs that way. `Retry-After` wins
+    over the exponential delay when the server sends it, since that is the server
+    telling us exactly how long it wants.
     """
     for attempt in range(retries):
         try:
@@ -214,6 +234,11 @@ def fetch(
                 if attempt == retries - 1:
                     raise urllib.error.HTTPError(url, status, "server error", None, None)
                 time.sleep(2**attempt)
+                continue
+            if status in (429, 403):
+                if attempt == retries - 1:
+                    raise urllib.error.HTTPError(url, status, "throttled", None, None)
+                time.sleep(_retry_delay(headers.get("retry-after"), attempt))
                 continue
             if status >= 400:
                 raise urllib.error.HTTPError(url, status, "client error", None, None)
