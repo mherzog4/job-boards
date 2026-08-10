@@ -1,0 +1,25 @@
+openwiki/quickstart.md
+  s_203c903a6a906b::t_a75175288621eb 45,57
+openwiki/workflows/index.md
+  s_203c903a6a906b::t_7c6492054e5b6e 4
+openwiki/workflows/job-scrape.md
+  s_203c903a6a906b::t_b6dd1844c06737 4,19,47-49,57,80,82
+openwiki/testing.md
+  s_203c903a6a906b::t_19c02c95c566c8 31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "5d9a7c17dfebe0f8b635c2f20f545fe15aab12c3",
+  "prompts": {},
+  "sessions": {
+    "s_203c903a6a906b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fdee30a0-2045-4217-8597-9e3ffa9f96d9",
+        "model": "unknown"
+      },
+      "human_author": "Mherzog4 <matthewherzog4@gmail.com>"
+    }
+  }
+}
