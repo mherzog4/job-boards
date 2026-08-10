@@ -88,7 +88,9 @@ Greenhouse is the expensive case: its normal list endpoint omits descriptions, s
 
 For repeat `--all --new-only` scans with the database enabled, `main()` loads stored per-board ETags from the [data model](../architecture/data-model.md), passes them as `If-None-Match`, treats `NotModified` as an unchanged board with no rows to emit, and reports the `unchanged` count in progress output. The gate is intentionally narrow: `may_use_etags()` rejects title, grep, since, and remote filters because a 304 is only safe when the previous ETag came from a full persisted board fetch and the current run only needs newly unseen rows.
 
-The worker function inside `main()` retries each board once for non-404 exceptions. A `NotFound` marks the `(ats, slug)` dead for the run. After an unlimited run, dead boards are pruned from generated `boards.json` for the selected platforms so future runs skip them. Limited runs do not rewrite the full cache.
+The worker function inside `main()` retries each board once for non-404 exceptions. A `NotFound` still marks the `(ats, slug)` dead on the first attempt. After an unlimited run, dead boards are pruned from generated `boards.json` for the selected platforms so future runs skip them. Limited runs do not rewrite the full cache.
+
+Throttling responses are handled inside the shared HTTP client before the worker sees a board failure. `fetch()` now backs off on `429` and `403`, honours a seconds-form `Retry-After` header when present, caps that server-requested delay at 30 seconds, and only raises if the throttled response persists through the configured retries. This prevents a temporarily refused board from being dropped for the whole run while keeping true `404` boards cheap to discard.
 
 Payload shape failures are not swallowed by `scan_board()`; missing or non-list jobs payloads raise `ValueError`. The surrounding worker logs the board after the second failed attempt and continues scanning others, which keeps broad scrapes resilient without hiding API-shape regressions in tests.
 

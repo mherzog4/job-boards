@@ -19,7 +19,7 @@ export JOB_SCRAPER_CONTACT="you@example.com"
 
 `/job_boards.py` includes the value in the `User-Agent` for both archive discovery and posting API calls. The old `ASHBY_SCRAPER_CONTACT` name is still accepted as a fallback for compatibility. The code defaults to a safe ASCII fallback and strips non-ASCII characters so a missing or unusual contact value does not break all requests.
 
-Keep concurrency modest. The script defaults to 8 workers for API calls and board validation across Ashby, Greenhouse, and Lever. Common Crawl paging is sequentially throttled to one request per second in the fallback path.
+Keep concurrency modest. The script defaults to 8 workers for API calls and board validation across Ashby, Greenhouse, and Lever. Common Crawl paging is sequentially throttled to one request per second in the fallback path. When a posting API returns `429` or `403`, the shared HTTP client used by the [job scrape workflow](../workflows/job-scrape.md) backs off instead of dropping the board immediately; it honours seconds-form `Retry-After` values when present and caps them at 30 seconds.
 
 ## Routine runs
 
@@ -75,7 +75,7 @@ This is more than cleanup. A full generated `boards.json` is effectively three v
 | `Common Crawl returned 503` | Common Crawl is rate-limiting or protecting itself from client pressure. | Wait before retrying; do not increase request rate. |
 | Common Crawl 502 or 504 | Common Crawl index backend overloaded. | Retry later; Wayback is the preferred default. |
 | Board discovery fails entirely | Wayback and Common Crawl unreachable. | Use the committed seed or existing cache; discovery is optional for a fresh clone. |
-| Many board scan errors | A platform API shape or network behavior may have changed. | Inspect stderr, run tests, and verify `scan_board()` still receives the jobs list shape expected by the platform adapter. |
+| Many board scan errors | A platform API shape or network behavior may have changed. | Inspect stderr, run tests, and verify `scan_board()` still receives the jobs list shape expected by the platform adapter. `429` or `403` should already have backed off inside `fetch()` before surfacing as persistent failures. |
 | Greenhouse `--grep` is unexpectedly slow or large | Greenhouse descriptions require `?content=true`, which is much larger than normal list payloads. | Scope with `--ats`, `--limit`, or a smaller board set unless a full Greenhouse description sweep is intended. |
 | `--new-only` exits before scanning | It needs SQLite history and was combined with `--no-db`. | Keep the database enabled or drop `--new-only`. |
 | `--since` returns fewer rows than expected | Missing, malformed, or older `publishedAt` values are excluded because freshness must be provable. | Use a wider duration or an unfiltered `--all` run when completeness matters. |
