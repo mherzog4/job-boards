@@ -1,0 +1,28 @@
+test_job_boards.py
+  s_203c903a6a906b::t_a90182a8bc037b 467-499
+README.md
+  s_203c903a6a906b::t_a3e0ab4460fff8 57
+  s_203c903a6a906b::t_09b5cda31faace 244-246,249,253-254
+  s_203c903a6a906b::t_4c4cd97bd46f78 255
+job_boards.py
+  s_203c903a6a906b::t_30886ee995a190 982
+  s_203c903a6a906b::t_2587d9fd833063 1080
+  s_203c903a6a906b::t_81b8de92c6eee1 683-684
+  s_203c903a6a906b::t_929d398378b474 712-720
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "b06352be699ae2efa5747350b953a585d50b0607",
+  "prompts": {},
+  "sessions": {
+    "s_203c903a6a906b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fdee30a0-2045-4217-8597-9e3ffa9f96d9",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Mherzog4 <matthewherzog4@gmail.com>"
+    }
+  }
+}
