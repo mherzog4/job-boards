@@ -1,0 +1,32 @@
+openwiki/workflows/job-scrape.md
+  s_203c903a6a906b::t_3e8452ed8baec3 4,19,48-50,58,81,83
+test_job_boards.py
+  s_203c903a6a906b::t_3e8452ed8baec3 468-500
+job_boards.py
+  s_203c903a6a906b::t_3e8452ed8baec3 708-709,737-745,1007,1120
+openwiki/testing.md
+  s_203c903a6a906b::t_3e8452ed8baec3 31
+openwiki/quickstart.md
+  s_203c903a6a906b::t_3e8452ed8baec3 45,57
+README.md
+  s_203c903a6a906b::t_3e8452ed8baec3 57,244-246,249,253-254
+  s_203c903a6a906b::t_5f6efd2f60985f 255
+openwiki/workflows/index.md
+  s_203c903a6a906b::t_3e8452ed8baec3 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "97de3da72ad7708f73a116f0a7e993bcdd2803f0",
+  "prompts": {},
+  "sessions": {
+    "s_203c903a6a906b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fdee30a0-2045-4217-8597-9e3ffa9f96d9",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Mherzog4 <matthewherzog4@gmail.com>"
+    }
+  }
+}
