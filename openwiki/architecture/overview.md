@@ -50,7 +50,7 @@ This diagram follows `main()`, `load_boards()`, `SOURCES`, `scan_board()`, and `
 | Component | Source | Responsibility |
 |---|---|---|
 | CLI parser | `/job_boards.py` `main()` | Validates flag combinations, parses `--ats`, compiles optional grep regex, derives default title behavior, selects board subset, orchestrates scanning and writing. |
-| HTTP client | `/job_boards.py` `fetch()`, `_single_request()`, `_pooled_request()` | Adds `User-Agent`, gzip, and optional `If-None-Match` headers; reuses per-thread connections for posting API hosts; lowercases response headers; captures ETags for safe runs; decompresses gzip responses; maps 304 to `NotModified`, 404 to `NotFound`, and 503 to `RateLimited`; and retries transient 5xx/URL errors or one dead pooled connection. |
+| HTTP client | `/job_boards.py` `fetch()`, `_single_request()`, `_pooled_request()`, `_retry_delay()` | Adds `User-Agent`, gzip, and optional `If-None-Match` headers; reuses per-thread connections for posting API hosts; lowercases response headers; captures ETags for safe runs; decompresses gzip responses; maps 304 to `NotModified`, 404 to `NotFound`, and 503 to `RateLimited`; backs off on throttling responses `429` and `403` using seconds-form `Retry-After` capped at 30 seconds; and retries transient 5xx/URL errors or one dead pooled connection. |
 | ATS adapters | `/job_boards.py` `SOURCES`, `normalize_ashby()`, `normalize_greenhouse()`, `normalize_lever()` | Define archive domains, posting API URL templates, payload job extraction, optional content parameters, and normalization into the shared row shape. |
 | Board loader | `/job_boards.py` `load_boards()` | Merges generated `boards.json` and `/boards.seed.json` by platform, or calls discovery for each selected ATS on `--refresh-boards`. |
 | Scanner | `/job_boards.py` `scan_board()` | Fetches one platform board with an optional board ETag, validates payload shape, normalizes jobs, filters rows, and retains only grep fragments from descriptions. |
@@ -68,7 +68,8 @@ Concurrency is deliberately simple: `ThreadPoolExecutor(max_workers=args.concurr
 
 ## Error handling boundaries
 
-- A 404 while scanning a board marks the `(ats, slug)` dead for the current run; if the run is not limited, the code rewrites `boards.json` without dead slugs for the selected platforms.
+- A 404 while scanning a board marks the `(ats, slug)` dead for the current run on the first attempt; if the run is not limited, the code rewrites `boards.json` without dead slugs for the selected platforms.
+- Throttling responses `429` and `403` do not mark the board dead immediately. `fetch()` backs off, honours seconds-form `Retry-After` when present, caps that delay at 30 seconds, and only raises after retries are exhausted.
 - Platform payloads that do not yield a jobs list raise `ValueError` so API shape changes fail loudly instead of looking like zero matches.
 - `--all` cannot be combined with `--title` or `--grep`; only unfiltered scans have the standing to close missing postings in the [data model](data-model.md).
 - Invalid `--ats` values exit before scanning; valid values come from `SOURCES`.
