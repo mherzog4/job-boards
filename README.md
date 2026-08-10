@@ -276,6 +276,38 @@ gigabytes; scope it with `--ats` or `--limit` unless you mean it.
 Fuzzy is much wider than exact: on a 26-board Ashby sample, `software engineer` returned
 **268** jobs fuzzy against **2** exact, because most companies prefix with Senior/Staff.
 
+## Boards that fail, and retrying just those
+
+A board can error rather than answer: a throttle, a timeout, a connection dropped
+mid-run. The `N err` figure in the progress line counts those, and each one prints to
+stderr — but a count is not a recovery plan, and re-running a 13,000-board sweep to
+recover eight of them is absurd.
+
+So the failures are written to `<out>.failed.json`, in the same shape as `boards.json`:
+
+```json
+{ "greenhouse": ["yotpo", "yieldmo", "yld"] }
+```
+
+`--boards-from` reads that shape, so the retry is the same command with one flag
+swapped:
+
+```bash
+uv run job_boards.py --ats greenhouse --all         # ... 8 boards error
+uv run job_boards.py --all --boards-from job-boards.failed.json   # just those 8
+```
+
+The file is written only when something failed, and deleted when nothing did, so a
+stale one from an earlier run cannot be mistaken for this run's result. 404s are not
+included — a dead slug is an expected answer rather than a failure, and it is already
+pruned from `boards.json` automatically.
+
+`--boards-from` restricts which *boards* are scanned, not which postings are kept, so
+it does not touch either gate: closing is already scoped to the boards a run actually
+visited, the same rule that keeps `--limit 10` from closing postings at companies it
+never opened. It does disable the 404 self-prune, since a caller-supplied subset must
+not be written back as though it were the whole discovered list.
+
 ## The database
 
 Every run also upserts into `job-boards.db` (SQLite, stdlib, no setup). The CSV is a

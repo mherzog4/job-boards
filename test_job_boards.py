@@ -5,6 +5,7 @@
 # ///
 """Offline self-check. Run: uv run test_job_boards.py  (or python3 test_job_boards.py)"""
 
+import contextlib
 import csv
 import io
 from datetime import datetime, timezone
@@ -878,6 +879,87 @@ def test_csv_quoting():
     row = list(csv.DictReader(io.StringIO(buf.getvalue())))[0]
     assert row["title"] == 'Senior Software Engineer, Backend "Core"'
     assert row["location"] == "Remote – US • EU"
+
+
+def test_failed_boards_round_trip_through_boards_from():
+    """A failure file has to be readable as a board list, or the retry is manual.
+
+    The count on stderr told you 8 boards failed but not which, so recovering them
+    meant re-scanning all 13,000. The file is written in boards.json's shape
+    precisely so `--boards-from <out>.failed.json` consumes it unchanged.
+    """
+    from job_boards import _read_boards
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "run.failed.json"
+        failed = [("greenhouse", "yotpo"), ("greenhouse", "yieldmo"), ("ashby", "acme")]
+
+        by_platform = {}
+        for ats, slug in failed:
+            by_platform.setdefault(ats, []).append(slug)
+        path.write_text(json.dumps(by_platform, indent=2))
+
+        assert _read_boards(path) == {
+            "greenhouse": ["yotpo", "yieldmo"], "ashby": ["acme"]
+        }, "the failure file must read back as a board list"
+
+
+def test_a_failed_board_is_written_to_the_failure_file_and_a_clean_run_clears_it():
+    """End to end, because this is the recovery path for lost data.
+
+    A board that errors must land in <out>.failed.json; a run where nothing fails
+    must delete a stale file rather than leave last run's failures readable as if
+    they were this run's.
+    """
+    import sys
+    import job_boards as jb
+
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "run"
+        boards = Path(tmp) / "boards.json"
+        boards.write_text(json.dumps({"ashby": ["good", "bad"]}))
+        argv = [
+            "job_boards.py", "--ats", "ashby", "--all", "--no-db",
+            "--boards-from", str(boards), "--out", str(out),
+        ]
+
+        def scan(ats, slug, *a, **k):
+            if slug == "bad":
+                raise ValueError("boom")
+            return []
+
+        original_scan, original_argv = jb.scan_board, sys.argv
+        jb.scan_board, sys.argv = scan, argv
+        quiet = io.StringIO()          # main() narrates to stderr; keep the suite clean
+        try:
+            with contextlib.redirect_stderr(quiet):
+                jb.main()
+            failure_file = Path(f"{out}.failed.json")
+            assert failure_file.exists(), "a failed board must be recorded, not just counted"
+            assert json.loads(failure_file.read_text()) == {"ashby": ["bad"]}, \
+                "only the board that failed belongs in the file"
+
+            jb.scan_board = lambda ats, slug, *a, **k: []      # nothing fails now
+            with contextlib.redirect_stderr(quiet):
+                jb.main()
+            assert not failure_file.exists(), \
+                "a clean run must clear the file, or stale failures read as current"
+        finally:
+            jb.scan_board, sys.argv = original_scan, original_argv
+
+
+def test_a_board_subset_still_may_not_widen_what_a_run_concludes():
+    """--boards-from restricts boards, not postings, so the gates do not move.
+
+    Closing is already scoped to the boards actually scanned — the same mechanism
+    that stops --limit 10 from closing postings at thousands of unvisited
+    companies. What may_close_postings guards is posting-level filters, and a
+    board subset is not one.
+    """
+    from job_boards import may_close_postings, may_use_etags
+    assert may_close_postings(None, None, None, False), \
+        "an unfiltered run over a board subset still saw every posting on those boards"
+    assert may_use_etags(None, None, None, False, True), \
+        "and it still persisted every one of them"
 
 
 if __name__ == "__main__":

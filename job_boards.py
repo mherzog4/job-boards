@@ -1011,6 +1011,13 @@ def main() -> None:
     )
     p.add_argument("--out", default="job-boards", help="output filename prefix")
     p.add_argument(
+        "--boards-from",
+        metavar="FILE",
+        help="scan only the boards in this file instead of the discovered list. "
+        "Takes the same shape as boards.json, which is what <out>.failed.json is "
+        "written in, so retrying a run's failures is --boards-from <out>.failed.json",
+    )
+    p.add_argument(
         "--db",
         default="job-boards.db",
         help="SQLite file accumulating every scrape (default: job-boards.db)",
@@ -1059,9 +1066,17 @@ def main() -> None:
             file=sys.stderr,
         )
 
-    boards = load_boards(
-        args.refresh_boards, ats_list, args.concurrency, recent=args.refresh_recent
-    )
+    if args.boards_from:
+        source = Path(args.boards_from)
+        if not source.is_absolute():
+            source = HERE / source
+        boards = _read_boards(source)
+        if not boards:
+            sys.exit(f"--boards-from {args.boards_from}: no boards in that file")
+    else:
+        boards = load_boards(
+            args.refresh_boards, ats_list, args.concurrency, recent=args.refresh_recent
+        )
     scanned = [
         (ats, slug)
         for ats in ats_list
@@ -1077,7 +1092,10 @@ def main() -> None:
 
     rows: list[dict] = []
     dead: set[tuple[str, str]] = set()
-    errors = 0
+    # Which boards failed, not just how many. A count on stderr left no way to
+    # re-scan the survivors of a throttle without repeating all 13,000 boards.
+    # list.append is atomic under the GIL, so this needs no lock — same as `dead`.
+    failed: list[tuple[str, str]] = []
 
     # Conditional requests, but only when a 304 genuinely means "nothing new here".
     db_path = HERE / args.db if not Path(args.db).is_absolute() else Path(args.db)
@@ -1093,7 +1111,7 @@ def main() -> None:
               file=sys.stderr)
 
     def work(item: tuple[str, str]) -> list[dict]:
-        nonlocal errors, unchanged
+        nonlocal unchanged
         ats, slug = item
         meta: dict = {}
         for attempt in range(2):
@@ -1116,7 +1134,7 @@ def main() -> None:
                 return []
             except Exception as e:
                 if attempt:
-                    errors += 1
+                    failed.append(item)
                     print(f"  ! {ats}/{slug}: {e}", file=sys.stderr)
         return []
 
@@ -1126,7 +1144,7 @@ def main() -> None:
             if i % 500 == 0 or i == len(scanned):
                 print(
                     f"  {i}/{len(scanned)} boards | {len(dead)} 404 | "
-                    f"{errors} err | {unchanged} unchanged | {len(rows)} matches",
+                    f"{len(failed)} err | {unchanged} unchanged | {len(rows)} matches",
                     file=sys.stderr,
                 )
 
@@ -1150,8 +1168,28 @@ def main() -> None:
     json_path = HERE / f"{args.out}.json"
     json_path.write_text(json.dumps(rows, indent=2))
 
-    # Self-prune: drop slugs that 404'd so later runs skip them.
-    if dead and not args.limit:
+    # Boards that errored, in the same shape as boards.json, so the retry is just
+    # `--boards-from <out>.failed.json`. Written only when something failed, and
+    # removed otherwise so a stale file from an earlier run cannot be re-read as
+    # if it described this one. 404s are excluded: a dead slug is an expected
+    # answer, not a failure, and it is already self-pruned below.
+    failed_path = HERE / f"{args.out}.failed.json"
+    if failed:
+        by_platform: dict[str, list[str]] = {}
+        for ats, slug in failed:
+            by_platform.setdefault(ats, []).append(slug)
+        failed_path.write_text(json.dumps(by_platform, indent=2))
+        print(f"  {len(failed)} board{'s' if len(failed) != 1 else ''} failed -> "
+              f"{failed_path.name} (retry with --boards-from {failed_path.name})",
+              file=sys.stderr)
+    elif failed_path.exists():
+        failed_path.unlink()
+
+    # Self-prune: drop slugs that 404'd so later runs skip them. Skipped for
+    # --boards-from as well as --limit: `boards` is then a caller-supplied subset,
+    # and with no cache on disk to fall back to it would be written out as though
+    # it were the whole discovered board list.
+    if dead and not args.limit and not args.boards_from:
         cached = _read_boards(BOARDS_CACHE) or boards
         for ats in ats_list:
             cached[ats] = [s for s in cached.get(ats, []) if (ats, s) not in dead]
