@@ -1,0 +1,35 @@
+README.md
+  s_203c903a6a906b::t_0d8a4b243a13c6 279-310
+job_boards.py
+  s_203c903a6a906b::t_75261644b33c63 1114
+  s_203c903a6a906b::t_9213616c566810 1147
+  s_203c903a6a906b::t_da8a4384e6c6f2 1014-1019
+  s_203c903a6a906b::t_71e35c86e8cca4 1188-1192
+  s_203c903a6a906b::t_a85c0bf77564a7 1137
+  s_203c903a6a906b::t_f5e19c493960e5 1182-1184
+  s_203c903a6a906b::t_a8745824d48359 1171-1181,1185-1187
+  s_203c903a6a906b::t_83ec79e7aea6d1 1069-1079
+  s_203c903a6a906b::t_03f3a2b6614500 1095-1098
+  s_203c903a6a906b::t_b76b0b1996b666 1013
+test_job_boards.py
+  s_203c903a6a906b::t_38fc667f9e1e4a 8
+  s_203c903a6a906b::t_1a5724c45929b0 932,934-935,942-943
+  s_203c903a6a906b::t_71f173e413dac8 906-931,933,936-941,944-949
+  s_203c903a6a906b::t_c825e084f13891 884-905,950-964
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "2f79df9f08154f58cf51b20840a08dfc7275ca8d",
+  "prompts": {},
+  "sessions": {
+    "s_203c903a6a906b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fdee30a0-2045-4217-8597-9e3ffa9f96d9",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Mherzog4 <matthewherzog4@gmail.com>"
+    }
+  }
+}
