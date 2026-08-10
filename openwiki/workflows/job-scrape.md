@@ -23,6 +23,7 @@ This workflow consumes slugs from [board discovery](board-discovery.md), calls e
 - `--sort board` keeps the default platform/company/title grouping; `--sort recent` puts the newest normalized `publishedAt` first and leaves undated postings last, which is the intended pairing for freshness runs such as `--since 1d`.
 - `--remote` keeps only jobs whose normalized `isRemote` value is truthy. Ashby provides a remote flag, Greenhouse infers it from the location label, and Lever uses `workplaceType == "remote"`.
 - `--limit` scans only the first N loaded boards per platform.
+- `--boards-from FILE` scans only boards listed in a `boards.json`-shaped file, which is also the shape used by `<out>.failed.json` for retrying transient board failures without a full sweep.
 - `--concurrency` controls the thread-pool size and defaults to 8.
 
 ## Per-board scan flow
@@ -88,9 +89,9 @@ Greenhouse is the expensive case: its normal list endpoint omits descriptions, s
 
 For repeat `--all --new-only` scans with the database enabled, `main()` loads stored per-board ETags from the [data model](../architecture/data-model.md), passes them as `If-None-Match`, treats `NotModified` as an unchanged board with no rows to emit, and reports the `unchanged` count in progress output. The gate is intentionally narrow: `may_use_etags()` rejects title, grep, since, and remote filters because a 304 is only safe when the previous ETag came from a full persisted board fetch and the current run only needs newly unseen rows.
 
-The worker function inside `main()` retries each board once for non-404 exceptions. A `NotFound` marks the `(ats, slug)` dead for the run. After an unlimited run, dead boards are pruned from generated `boards.json` for the selected platforms so future runs skip them. Limited runs do not rewrite the full cache.
+The worker function inside `main()` retries each board once for non-404 exceptions. A `NotFound` marks the `(ats, slug)` dead for the run. After an unlimited run loaded from the normal discovered list, dead boards are pruned from generated `boards.json` for the selected platforms so future runs skip them. Limited runs do not rewrite the full cache, and `--boards-from` also disables this 404 self-prune because a caller-supplied subset must not be written back as if it were the complete cache.
 
-Payload shape failures are not swallowed by `scan_board()`; missing or non-list jobs payloads raise `ValueError`. The surrounding worker logs the board after the second failed attempt and continues scanning others, which keeps broad scrapes resilient without hiding API-shape regressions in tests.
+Payload shape failures are not swallowed by `scan_board()`; missing or non-list jobs payloads raise `ValueError`. The surrounding worker records the board after the second failed attempt, logs it, and continues scanning others. After outputs are written, any non-404 failures are grouped by ATS and written to `<out>.failed.json` in `boards.json` shape, so an operator can retry just those boards with `--boards-from <out>.failed.json`. The file is written only when at least one board failed and is deleted on a clean run so stale failures cannot masquerade as current results.
 
 ## Output writing
 

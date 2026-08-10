@@ -42,6 +42,9 @@ uv run job_boards.py --ats ashby,lever --all
 uv run job_boards.py --title "software engineer"
 uv run job_boards.py --grep '\brust\b|\bgolang\b'
 
+# Retry only boards that errored in the previous run.
+uv run job_boards.py --all --boards-from job-boards.failed.json
+
 # Offline regression suite.
 uv run test_job_boards.py
 python3 test_job_boards.py  # fallback when uv is unavailable and Python is 3.9+
@@ -75,7 +78,7 @@ This is more than cleanup. A full generated `boards.json` is effectively three v
 | `Common Crawl returned 503` | Common Crawl is rate-limiting or protecting itself from client pressure. | Wait before retrying; do not increase request rate. |
 | Common Crawl 502 or 504 | Common Crawl index backend overloaded. | Retry later; Wayback is the preferred default. |
 | Board discovery fails entirely | Wayback and Common Crawl unreachable. | Use the committed seed or existing cache; discovery is optional for a fresh clone. |
-| Many board scan errors | A platform API shape or network behavior may have changed. | Inspect stderr, run tests, and verify `scan_board()` still receives the jobs list shape expected by the platform adapter. |
+| Many board scan errors | A platform API shape, throttle, timeout, or network behavior may have changed. | Inspect stderr, run tests, and verify `scan_board()` still receives the jobs list shape expected by the platform adapter. Non-404 failures are also written to `<out>.failed.json`; retry just those boards with `--boards-from <out>.failed.json`. |
 | Greenhouse `--grep` is unexpectedly slow or large | Greenhouse descriptions require `?content=true`, which is much larger than normal list payloads. | Scope with `--ats`, `--limit`, or a smaller board set unless a full Greenhouse description sweep is intended. |
 | `--new-only` exits before scanning | It needs SQLite history and was combined with `--no-db`. | Keep the database enabled or drop `--new-only`. |
 | `--since` returns fewer rows than expected | Missing, malformed, or older `publishedAt` values are excluded because freshness must be provable. | Use a wider duration or an unfiltered `--all` run when completeness matters. |
