@@ -54,7 +54,7 @@ uv run job_boards.py --ats ashby,lever --all         # a subset
 uv run job_boards.py --title "software engineer"
 uv run job_boards.py --title "software engineer" --match exact
 uv run job_boards.py --title "product designer" --remote --limit 200
-uv run job_boards.py --grep '\brust\b|\bgolang\b'    # search descriptions
+uv run job_boards.py --grep '\brust\b|\bgolang\b'    # search titles + descriptions
 uv run job_boards.py --all --since 7d                # only the last week's postings
 uv run job_boards.py --all --new-only                # only what the db has not seen
 uv run test_job_boards.py                            # offline self-check
@@ -241,14 +241,17 @@ querying `senior software engineer` also matches every job titled just `Engineer
 ## Searching descriptions with `--grep`
 
 Titles are a weak filter — they miss "Software Development Engineer" and tell you nothing
-about the stack. `--grep` runs a case-insensitive regex against the job description and
-puts the surrounding context in a `matched` column, so a hit can be judged without
-opening the posting.
+about the stack. `--grep` runs a case-insensitive regex against the job title *and*
+description and puts the surrounding context in a `matched` column, so a hit can be
+judged without opening the posting.
 
 ```bash
-uv run job_boards.py --grep '\brust\b|\bgolang\b'          # description only
+uv run job_boards.py --grep '\brust\b|\bgolang\b'          # title and description
 uv run job_boards.py --title engineer --grep '\bkubernetes\b'  # both must match
 ```
+
+The two fields are searched separately, not concatenated, so a pattern cannot match
+across the seam between them and report a hit that is in neither.
 
 `--title` and `--grep` are ANDed. Giving `--grep` alone drops the title filter entirely
 rather than silently ANDing the default `software engineer` onto it.

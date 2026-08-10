@@ -42,7 +42,7 @@ Set `JOB_SCRAPER_CONTACT` before real network runs so archive operators and API 
 
 - [Architecture overview](architecture/overview.md) explains how `main()`, source adapters, board loading, scraping, outputs, and persistence fit together.
 - [Board discovery workflow](workflows/board-discovery.md) explains Wayback/Common Crawl candidate harvesting, platform-specific slug filtering, `HEAD` validation, cache semantics, and why `boards.json` is ignored.
-- [Job scrape workflow](workflows/job-scrape.md) explains CLI filters, title matching, description grep, remote filtering, per-ATS normalization, concurrency, output writing, and failure handling.
+- [Job scrape workflow](workflows/job-scrape.md) explains CLI filters, title matching, title-or-description grep, remote filtering, per-ATS normalization, concurrency, output writing, and failure handling.
 - [Data model](architecture/data-model.md) documents output row fields, SQLite schema, composite upsert key, and posting lifecycle semantics.
 - [Operations runbook](operations/runbook.md) covers scheduled usage, freshness expectations, privacy/git hygiene, rate-limit guidance, and the OpenWiki drift-check workflow.
 - [Testing guide](testing.md) summarizes the offline regression suite and verification caveats.
@@ -54,7 +54,7 @@ Recent commits show a progression from a simple public Ashby board scraper into 
 
 - Initial implementation added the dependency-free Ashby CLI, seed boards, README, and offline tests.
 - The committed board list was split into `/boards.seed.json` while generated `boards.json` became ignored output, preventing full crawls from publishing customer lists.
-- `--grep` was added to search descriptions without retaining full descriptions in output rows.
+- `--grep` was added to search descriptions without retaining full descriptions in output rows; it now also searches titles separately so matches cannot span the title/description seam.
 - SQLite accumulation was added so repeated scrapes preserve `first_seen` and `last_seen`.
 - Discovery moved to Wayback-first with `HEAD` validation because Common Crawl was less reliable and narrower.
 - `--all` was added and board refreshes were changed to union archive results with seed and previous cache.
