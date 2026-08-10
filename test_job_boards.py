@@ -464,6 +464,39 @@ def test_grep_filters_on_description_and_records_context():
     assert "<b>" not in strict[0]["matched"], "markup must be stripped from fragments"
 
 
+def test_grep_matches_the_title_not_only_the_description():
+    """A posting whose subject is in its title was silently dropped.
+
+    Searching the description alone missed "SSO Integrations Lead" whenever the
+    body phrased it differently — exactly the postings a topic search most wants.
+    """
+    board = {"jobs": [
+        {"id": "1", "title": "SSO Integrations Lead", "isListed": True,
+         "descriptionPlain": "Own the identity roadmap end to end."},
+        {"id": "2", "title": "Warehouse Associate", "isListed": True,
+         "descriptionPlain": "Lift boxes."},
+    ]}
+    rows = _with_fetch(board, lambda: scan_board(
+        "ashby", "acme", None, False, "fuzzy", re.compile(r"\bsso\b", re.I)))
+    assert [r["title"] for r in rows] == ["SSO Integrations Lead"]
+    assert "SSO" in rows[0]["matched"], "the title hit must land in the matched column"
+
+
+def test_grep_does_not_match_across_the_title_description_seam():
+    """Title and description are searched apart, not concatenated.
+
+    Concatenating would let `engineer we` match the join between a title ending
+    "Engineer" and a body starting "We", reporting a hit present in neither field.
+    """
+    board = {"jobs": [
+        {"id": "1", "title": "Backend Engineer", "isListed": True,
+         "descriptionPlain": "We ship every day."},
+    ]}
+    rows = _with_fetch(board, lambda: scan_board(
+        "ashby", "acme", None, False, "fuzzy", re.compile(r"engineer we", re.I)))
+    assert rows == [], "a match spanning the seam belongs to neither field"
+
+
 def test_invalid_payload_raises_rather_than_returning_nothing():
     raised = False
     try:

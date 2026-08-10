@@ -680,7 +680,8 @@ def scan_board(
 
     Descriptions are read only when --grep needs them, and even then only the
     matched fragments survive — the full text dominates every payload, and holding
-    thousands of boards' worth would be gigabytes.
+    thousands of boards' worth would be gigabytes. --grep matches against the title
+    as well as the description; see the loop below for why they are searched apart.
     """
     source = SOURCES[ats]
     payload = json.loads(
@@ -708,7 +709,15 @@ def scan_board(
 
         hits: list[str] = []
         if pattern is not None:
-            hits = fragments(plain_text(norm["_description"]), pattern)
+            # The title is searched too. Searching only the description dropped
+            # postings whose subject is *in the title* — "SSO Integrations Lead",
+            # "Identity Platform Engineer" — whenever the body happened to phrase
+            # it differently. Searched separately rather than concatenated, or a
+            # regex could match across the seam and report a hit in neither field.
+            hits = fragments(plain_text(norm["title"]), pattern, limit=1)
+            for window in fragments(plain_text(norm["_description"]), pattern):
+                if window not in hits:
+                    hits.append(window)
             if not hits:
                 continue
 
@@ -970,7 +979,7 @@ def main() -> None:
     p.add_argument(
         "--grep",
         metavar="REGEX",
-        help="case-insensitive regex searched against the job description; "
+        help="case-insensitive regex searched against the job title and description; "
         "matching context lands in the 'matched' column. On Greenhouse this "
         "requests full content, which is ~26x the bytes",
     )
@@ -1068,7 +1077,7 @@ def main() -> None:
         for slug in (boards.get(ats, [])[: args.limit] if args.limit else boards.get(ats, []))
     ]
     criteria = [f"title {title!r} ({args.match})" if title else "",
-                f"description /{args.grep}/" if args.grep else "",
+                f"title or description /{args.grep}/" if args.grep else "",
                 f"published within {args.since}" if args.since else "",
                 "unseen postings only" if args.new_only else ""]
     what = " + ".join(c for c in criteria if c) or "every listed job"
