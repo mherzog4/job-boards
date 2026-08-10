@@ -1,7 +1,7 @@
 ---
 type: Workflow
 title: Job Scrape and Search Workflow
-description: Explains how the CLI scans Ashby, Greenhouse, and Lever boards, applies ATS, title, description, remote, and all-job filters, and writes CSV, JSON, and SQLite outputs.
+description: Explains how the CLI scans Ashby, Greenhouse, and Lever boards, applies ATS, title, grep, remote, and all-job filters, and writes CSV, JSON, and SQLite outputs.
 tags: [workflow, scraping, search, cli, ats]
 ---
 
@@ -16,7 +16,7 @@ This workflow consumes slugs from [board discovery](board-discovery.md), calls e
 - `--ats` selects `ashby`, `greenhouse`, `lever`, a comma-separated subset, or `all` by default. Unknown platforms exit before scanning.
 - `--all` means every listed job on every scanned board. It cannot be combined with `--title` or `--grep`.
 - `--title` filters titles. If no narrowing option is supplied, the default title is `software engineer`.
-- `--grep REGEX` searches descriptions with a case-insensitive regex. If `--grep` is supplied without `--title`, the title filter is dropped instead of silently ANDing the default title.
+- `--grep REGEX` searches job titles and descriptions with a case-insensitive regex. If `--grep` is supplied without `--title`, the title filter is dropped instead of silently ANDing the default title.
 - `--title` and `--grep` together are ANDed.
 - `--since AGE` keeps postings whose normalized `publishedAt` parses at or after the cutoff from `parse_duration()`. Accepted forms are `7d`, `2w`, `3m`, `1y`, or a bare day count; missing or malformed dates are excluded because the flag promises freshness.
 - `--new-only` removes rows whose `(ats, id)` already exists in SQLite via `known_keys()`. It is applied after board fetches so scanning stays storage-independent, and it exits early when combined with `--no-db`.
@@ -44,8 +44,9 @@ flowchart TD
     Title --> Fresh["apply since cutoff if present"]
     Fresh --> Remote["apply remote filter if requested"]
     Remote --> Grep{"grep pattern present"}
-    Grep -->|"yes"| Text["strip description markup"]
-    Text --> Fragments["keep up to two match fragments"]
+    Grep -->|"yes"| TitleGrep["search title for one fragment"]
+    TitleGrep --> Text["strip description markup"]
+    Text --> Fragments["search description for two fragments"]
     Fragments --> Row["emit row with ats"]
     Grep -->|"no"| Row
     Row --> Outputs["CSV JSON and optional SQLite"]
@@ -53,7 +54,7 @@ flowchart TD
 
 This flow shows the per-board filtering path before `main()` applies database-backed `--new-only` filtering.
 
-`scan_board()` implements the branch logic through description matching; `main()` supplies ETags only when `may_use_etags()` says the run is safe, then applies `--new-only` against SQLite before writing outputs.
+`scan_board()` implements the branch logic through grep matching; `main()` supplies ETags only when `may_use_etags()` says the run is safe, then applies `--new-only` against SQLite before writing outputs.
 
 ## Platform adapters
 
@@ -76,9 +77,9 @@ This flow shows the per-board filtering path before `main()` applies database-ba
 
 The two-word guard prevents a long query such as `senior software engineer` from matching every one-word title like `Engineer`, `Software`, or `Senior`. Empty title or empty query returns false.
 
-## Description grep
+## Grep matching
 
-`--grep` compiles a case-insensitive Python regex. `scan_board()` turns each adapter's `_description` value into plain text with `plain_text()`, extracts up to two context windows with `fragments()`, and joins them with ` … ` into the `matched` column. Full descriptions are not retained, which keeps this workflow compatible with the [data model](../architecture/data-model.md) and the README's memory/payload guidance.
+`--grep` compiles a case-insensitive Python regex. `scan_board()` searches the normalized title and each adapter's `_description` separately: title hits contribute at most one fragment, description hits contribute up to two context windows after `plain_text()` strips markup, and duplicate windows are skipped before joining them with ` … ` into the `matched` column. The fields are not concatenated, so a pattern cannot match across the seam between a title ending with one word and a description beginning with the next. Full descriptions are not retained, which keeps this workflow compatible with the [data model](../architecture/data-model.md) and the README's memory/payload guidance.
 
 The CLI warns when a grep pattern contains no `\b` word boundary because terms can match inside boilerplate words. The tests document the real footgun: `rust` also matches `trust`, while `\brust\b` avoids that false positive.
 
