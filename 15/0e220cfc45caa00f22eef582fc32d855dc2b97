@@ -1,0 +1,31 @@
+openwiki/workflows/job-scrape.md
+  s_31cbbcf807213b::t_3bd7bc29239fbe 26,92,94
+openwiki/operations/runbook.md
+  s_203c903a6a906b::t_ec269c5df2979d 45-47,81
+openwiki/testing.md
+  s_203c903a6a906b::t_03cb5d4473da5c 30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "150e220cfc45caa00f22eef582fc32d855dc2b97",
+  "prompts": {},
+  "sessions": {
+    "s_203c903a6a906b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fdee30a0-2045-4217-8597-9e3ffa9f96d9",
+        "model": "unknown"
+      },
+      "human_author": "Mherzog4 <matthewherzog4@gmail.com>"
+    },
+    "s_31cbbcf807213b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "019fe9be-d5a3-7260-ad2a-3c66f0ab2f25",
+        "model": "unknown"
+      },
+      "human_author": "Mherzog4 <matthewherzog4@gmail.com>"
+    }
+  }
+}
